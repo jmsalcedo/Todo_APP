@@ -1,21 +1,50 @@
-# Todo App (FastAPI)
+# Todo App (FastAPI + PostgreSQL)
 
-A minimal TODO app using FastAPI with in-memory storage (no database).
+A TODO app using FastAPI with PostgreSQL database and SQLAlchemy ORM.
 
-## Files added
+## Files
 
-- `main.py` - FastAPI application with endpoints
+- `main.py` - FastAPI application with database endpoints
+- `models.py` - SQLAlchemy Todo model
+- `schemas.py` - Pydantic request/response schemas
+- `database.py` - Database connection and session management
 - `requirements.txt` - pip dependencies
-- `environment.yml` - Conda environment file (optional)
+- `environment.yml` - Conda environment file
+
+## Prerequisites
+
+- PostgreSQL running locally or remotely
+- Python 3.11+
+
+## Database Setup
+
+Create a PostgreSQL database and user:
+
+```sql
+CREATE USER todouser WITH PASSWORD 'todopassword';
+CREATE DATABASE todoapp OWNER todouser;
+```
+
+## Environment Setup
+
+Set the database URL (PowerShell):
+
+```powershell
+$env:DATABASE_URL="postgresql://todouser:todopassword@localhost/todoapp"
+```
+
+Or create a `.env` file in the project root:
+
+```
+DATABASE_URL=postgresql://todouser:todopassword@localhost/todoapp
+```
 
 ## Create environment & install (Conda)
-
-Open PowerShell and run:
 
 ```powershell
 conda env create -f environment.yml
 conda activate todo-app
-pip install -r requirements.txt  # optional if environment.yml already installed pip packages
+pip install -r requirements.txt
 ```
 
 ## Create environment & install (venv)
@@ -43,7 +72,7 @@ Then open http://127.0.0.1:8000/docs for the interactive API docs (Swagger UI).
 - `PUT /todos/{id}` - update a todo (body: `title`, optional `description`, optional `completed` query)
 - `DELETE /todos/{id}` - delete todo
 
-## Examples (curl)
+## Examples (curl/PowerShell)
 
 Create:
 
@@ -51,22 +80,22 @@ Create:
 curl -X POST "http://127.0.0.1:8000/todos" -H "Content-Type: application/json" -d '{"title": "Buy milk", "description": "2 liters"}'
 ```
 
-List:
+List all:
 
 ```powershell
 curl http://127.0.0.1:8000/todos
 ```
 
-Get:
+Get by ID:
 
 ```powershell
 curl http://127.0.0.1:8000/todos/1
 ```
 
-Update (set completed=true):
+Update (partial):
 
 ```powershell
-curl -X PUT "http://127.0.0.1:8000/todos/1?completed=true" -H "Content-Type: application/json" -d '{"title":"Buy milk","description":"2 liters"}'
+curl -X PUT "http://127.0.0.1:8000/todos/1" -H "Content-Type: application/json" -d '{"completed": true}'
 ```
 
 Delete:

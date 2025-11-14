@@ -4,6 +4,10 @@ channels:
 dependencies:
   - python=3.11
   - pip
+  - postgresql
   - pip:
     - fastapi
     - uvicorn[standard]
+    - sqlalchemy
+    - psycopg2-binary
+    - python-dotenv
