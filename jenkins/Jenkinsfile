@@ -1,7 +1,8 @@
+// jenkins/Jenkinsfile
 pipeline {
     agent {
         docker {
-            image 'python:3.12-slim'
+            image 'python:3.14-slim' // Cambiado a 3.14 para coincidir con tu app
             args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
@@ -10,9 +11,14 @@ pipeline {
         PATH = "/root/.local/bin:${env.PATH}"
         TEST_NETWORK = "todo-net-${BUILD_NUMBER}"
         DB_HOST = "tododbtest-${BUILD_NUMBER}"
-        DATABASE_URL = "postgresql://user:password@${DB_HOST}:5432/todo_db"
         
-        // Configuración DockerHub (Cambia 'tu-usuario' por el real)
+        // PUERTOS NO CONVENCIONALES
+        DB_PORT = "5433" 
+        APP_PORT = "9000"
+        
+        // URL de conexión usando el puerto 5433
+        DATABASE_URL = "postgresql://user:password@${DB_HOST}:${env.DB_PORT}/todo_db"
+        
         DOCKER_IMAGE = "kaoru751/todo-app-backend"
         DOCKER_TAG = "${BUILD_NUMBER}"
     }
@@ -27,13 +33,9 @@ pipeline {
         stage('Setup Environment') {
             steps {
                 script {
-                    echo 'Instalando herramientas de sistema...'
+                    echo 'Instalando herramientas y redes...'
                     sh 'apt-get update && apt-get install -y curl docker.io'
-                    // Instalar Trivy (Seguridad)
-                    sh '''
-                    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-                    '''
-                    // Instalar uv (Paquetes)
+                    sh 'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin'
                     sh 'curl -LsSf https://astral.sh/uv/install.sh | sh'
                     
                     sh "docker network create ${TEST_NETWORK}"
@@ -47,9 +49,7 @@ pipeline {
             steps {
                 script {
                     sh '/root/.local/bin/uv sync'
-                    echo 'Ejecutando Ruff (Linter/Calidad)...'
                     sh '/root/.local/bin/uv run ruff check .'
-                    echo 'Ejecutando Bandit (Seguridad de Código)...'
                     sh '/root/.local/bin/uv run bandit -r app/'
                 }
             }
@@ -58,11 +58,14 @@ pipeline {
         stage('Run Integration Tests') {
             steps {
                 script {
+                    // Iniciamos Postgres forzando el puerto 5433 mediante PGPORT
                     docker.image('postgres:15-alpine').withRun(
                         "--network ${env.TEST_NETWORK} --name ${env.DB_HOST} " +
-                        "-e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=todo_db"
+                        "-e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=todo_db " +
+                        "-e PGPORT=${env.DB_PORT}" 
                     ) { c ->
-                        sh 'sleep 20' // Esperar a Postgres
+                        echo "Esperando a la base de datos en el puerto ${env.DB_PORT}..."
+                        sh 'sleep 20' 
                         sh "DATABASE_URL=${env.DATABASE_URL} /root/.local/bin/uv run pytest"
                     }
                 }
@@ -71,15 +74,14 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                echo 'Construyendo imagen Docker...'
+                echo "Construyendo imagen preparada para el puerto ${env.APP_PORT}..."
+                // Puedes pasar el puerto como build-arg si tu Dockerfile lo soporta
                 sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ."
             }
         }
 
         stage('Security Scan (Trivy)') {
             steps {
-                echo 'Escaneando vulnerabilidades en la imagen...'
-                // Escanea la imagen y muestra errores críticos
                 sh "trivy image --severity CRITICAL --exit-code 0 ${DOCKER_IMAGE}:${DOCKER_TAG}"
             }
         }
@@ -114,7 +116,5 @@ pipeline {
                 sh "docker network rm ${env.TEST_NETWORK} || true"
             }
         }
-        success { echo 'Pipeline completado con éxito y publicado.' }
-        failure { echo 'El pipeline ha fallado. Revisa los logs.' }
     }
 }
