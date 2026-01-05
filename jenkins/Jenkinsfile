@@ -100,10 +100,12 @@ pipeline {
     post {
         always {
             script {
-                node {
-                    echo 'Cleaning up resources...'
+                echo 'Limpiando recursos...'
+                // Solo intenta borrar si las variables no son nulas
+                if (env.DB_HOST) {
                     sh "docker rm -f ${env.DB_HOST} || true"
-                    // Need to check if network exists before removing to avoid errors if creation failed
+                }
+                if (env.TEST_NETWORK) {
                     sh "docker network rm ${env.TEST_NETWORK} || true"
                 }
             }
