@@ -85,10 +85,12 @@ pipeline {
         }
 
         stage('Push to DockerHub') {
-            // Nota: Requiere configurar credenciales 'docker-hub-credentials' en Jenkins
             when {
                 expression { 
-                    return env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main'
+                    return env.BRANCH_NAME == 'main' || 
+                           env.GIT_BRANCH == 'main' || 
+                           env.GIT_BRANCH == 'origin/main' || 
+                           env.GIT_BRANCH == 'refs/remotes/origin/main'
                 }
             }
             steps {
