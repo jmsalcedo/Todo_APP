@@ -1,0 +1,18 @@
+FROM python:3.14-slim
+
+# Install system dependencies
+# Added postgresql-client for pg_isready
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    docker.io \
+    ca-certificates \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (The absolute fastest way to handle Python packages)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Install Trivy (Security Scanner)
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+WORKDIR /app
