@@ -1,50 +1,51 @@
-# Use a multi-stage build to keep the final image slim
-FROM python:3.12-slim AS builder
+# Stage 1: Build
+# Usamos 3.14-slim ya que tu pyproject.toml especifica >=3.14
+FROM python:3.14-slim AS builder
 
-# Install uv
+# Instalar uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Set working directory
 WORKDIR /app
 
-# Enable bytecode compilation
+# Variable para que uv no cree un entorno virtual separado si ya estamos en un contenedor (opcional pero recomendado)
 ENV UV_COMPILE_BYTECODE=1
 
-# Copy only dependency files first to leverage Docker cache
+# Copiar archivos de dependencias
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies without installing the project itself
-# --no-dev: exclude dev dependencies like pytest/ruff
-# --frozen: ensure lockfile consistency
+# Sincronizar dependencias (sin instalar el proyecto ni dependencias de dev)
+# Esto crea la carpeta /app/.venv
 RUN uv sync --frozen --no-install-project --no-dev
 
-# Final stage
-FROM python:3.12-slim
+# Stage 2: Final
+FROM python:3.14-slim
 
 WORKDIR /app
 
-# Set environment variables
+# Variables de entorno para Python
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-# Add the virtualenv bin to PATH
+
+# Añadimos el .venv al PATH para que 'uvicorn' sea reconocido directamente
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Copy the virtualenv from builder
+# Copiamos el entorno virtual completo desde el builder
 COPY --from=builder /app/.venv /app/.venv
 
-# Copy application code
+# Copiamos el código de la aplicación
 COPY . .
 
-# Expose port
+# Exponer puertos
 EXPOSE 8000
 
-# Create a non-root user for security
+# Usuario no-root por seguridad
 RUN addgroup --system appgroup && adduser --system --group appuser
 USER appuser
 
-# Healthcheck using python since curl is not installed in slim image
+# Healthcheck usando python
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD python3 -c 'import urllib.request; urllib.request.urlopen("http://localhost:8000/")' || exit 1
 
-# Run the application using the uvicorn from the virtualenv
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Cambiamos la forma de ejecución a python -m uvicorn 
+# Es más robusto que llamar al script directo si hay problemas de path
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
