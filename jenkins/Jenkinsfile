@@ -19,7 +19,7 @@ pipeline {
                     echo 'Instalando herramientas necesarias en el contenedor...'
                     // Instalamos curl para bajar uv. Git no es necesario aquí 
                     // porque Jenkins ya clonó el código desde fuera del contenedor.
-                    sh 'apt-get update && apt-get install -y curl'
+                    sh 'apt-get update && apt-get install -y curl docker.io'
                     sh 'curl -LsSf https://astral.sh/uv/install.sh | sh'
                     
                     // Verificamos instalación
