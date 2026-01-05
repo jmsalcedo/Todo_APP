@@ -25,7 +25,7 @@ pipeline {
     }
 
     stages {
-        stage('Initialize') {
+        stage('Setup Environment') {
             steps {
                 script {
                     sh "docker network create ${TEST_NETWORK}"
@@ -35,9 +35,9 @@ pipeline {
             }
         }
 
-        stage('Build & Test') {
+        stage('Validation & Testing') {
             parallel {
-                stage('Static Analysis') {
+                stage('Code Quality & Security') {
                     steps {
                         script {
                             echo 'Running Lint & Security analysis...'
@@ -48,7 +48,7 @@ pipeline {
                     }
                 }
 
-                stage('Integration Tests') {
+                stage('Integration Tests (Database)') {
                     steps {
                         script {
                             docker.image('postgres:15-alpine').withRun(
@@ -69,7 +69,7 @@ pipeline {
             }
         }
 
-        stage('Delivery') {
+        stage('Containerize & Security Scan') {
             steps {
                 script {
                     echo "Building and Scanning Image..."
@@ -79,7 +79,7 @@ pipeline {
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Publish Image to DockerHub') {
             when {
                 expression { 
                     return env.BRANCH_NAME == 'main' || 
