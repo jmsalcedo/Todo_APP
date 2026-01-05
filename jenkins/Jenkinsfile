@@ -7,28 +7,21 @@ pipeline {
     }
 
     environment {
-        // Usamos la ruta absoluta al HOME del usuario root en el contenedor
+        // Aseguramos que uv esté en el PATH para todos los stages
         PATH = "/root/.local/bin:${env.PATH}"
     }
-
-    stage('Checkout Project') {
-            steps {
-                echo 'Descargando código desde Git...'
-                // Descarga el código del repositorio configurado en Jenkins
-                checkout scm
-            }
-        }
 
     stages {
         stage('Setup Environment') {
             steps {
                 script {
+                    echo 'Instalando herramientas necesarias en el contenedor...'
+                    // Instalamos curl para bajar uv. Git no es necesario aquí 
+                    // porque Jenkins ya clonó el código desde fuera del contenedor.
                     sh 'apt-get update && apt-get install -y curl'
-                    // Instalamos uv
                     sh 'curl -LsSf https://astral.sh/uv/install.sh | sh'
                     
-                    // LLAMADA CLAVE: Usamos la ruta completa para el primer chequeo
-                    // Esto evita el "not found" si el PATH no se refrescó a tiempo
+                    // Verificamos instalación
                     sh '/root/.local/bin/uv --version'
                 }
             }
@@ -36,34 +29,37 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                // Aquí ya debería reconocer 'uv' por el bloque environment
-                // Si vuelve a fallar, usa la ruta completa: /root/.local/bin/uv sync
+                echo 'Sincronizando dependencias con uv...'
+                // uv sync busca el archivo pyproject.toml en la raíz
                 sh '/root/.local/bin/uv sync'
             }
         }
 
         stage('Lint & Static Analysis') {
             steps {
+                echo 'Ejecutando Linter (Ruff)...'
+                // Usamos la ruta absoluta por seguridad
                 sh '/root/.local/bin/uv run ruff check .'
             }
         }
 
         stage('Run Tests') {
             steps {
+                echo 'Ejecutando Pruebas (Pytest)...'
                 sh '/root/.local/bin/uv run pytest'
             }
         }
     }
 
     post {
+        success {
+            echo '¡Pipeline completado con éxito!'
+        }
         failure {
-            echo 'Error detectado. Si el error es "uv: not found", intenta reemplazar "uv" por "/root/.local/bin/uv" en los comandos sh.'
+            echo 'El pipeline falló. Revisa los pasos anteriores.'
         }
         always {
-            echo 'Finalizando el pipeline...'
-        }
-        success {
-            echo '¡El despliegue/test ha sido exitoso!'
+            echo 'Finalizando ejecución...'
         }
     }
 }
