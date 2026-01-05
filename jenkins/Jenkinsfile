@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         // Aseguramos que uv esté en el PATH para todos los stages
-        PATH = "/root/.local/bin:${env.PATH}",
+        PATH = "/root/.local/bin:${env.PATH}"
         DATABASE_URL = "postgresql://user:password@postgres:5432/todo_db"
     }
 
@@ -45,8 +45,8 @@ pipeline {
         }
 
         stage('Run Integration Tests') {
-            echo 'Ejecutando Pruebas (Pytest)...'
             steps {
+                echo 'Ejecutando Pruebas (Pytest)...'
                 script {
                     docker.image('postgres:15-alpine').withRun(
                         '-e POSTGRES_USER=user ' +
