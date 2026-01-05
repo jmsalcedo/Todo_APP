@@ -28,6 +28,7 @@ services:
       context: ./jenkins
     container_name: jenkins
     restart: always
+    user: root
     ports:
       - "8081:8080"
       - "50000:50000"

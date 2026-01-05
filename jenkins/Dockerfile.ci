@@ -1,10 +1,10 @@
+# jenkins/Dockerfile.ci
 FROM python:3.14-slim
 
-# Evitar prompts interactivos y archivos .pyc
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies
+# Instalar system dependencies incluyendo docker.io
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     docker.io \
@@ -12,10 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install uv (The absolute fastest way to handle Python packages)
+# Verificar que docker se instaló correctamente (esto fallará el build si no está)
+RUN docker --version
+
+# Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Install Trivy (Security Scanner)
+# Install Trivy
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
 WORKDIR /app
+
+# Asegurar que el PATH incluye las rutas estándar
+ENV PATH="/usr/local/bin:/usr/bin:/bin:${PATH}"
