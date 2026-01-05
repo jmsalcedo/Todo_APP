@@ -8,8 +8,11 @@ pipeline {
 
     environment {
         PATH = "/root/.local/bin:${env.PATH}"
-        // Esta URL debe coincidir con el nombre que le demos al contenedor (--name)
-        DATABASE_URL = "postgresql://user:password@tododbtest:5432/todo_db"
+        // Nombre de la red temporal para este build
+        TEST_NETWORK = "todo-net-${BUILD_NUMBER}"
+        // El nombre del host debe ser el mismo que el del contenedor
+        DB_HOST = "tododbtest-${BUILD_NUMBER}"
+        DATABASE_URL = "postgresql://user:password@${DB_HOST}:5432/todo_db"
     }
 
     stages {
@@ -19,6 +22,13 @@ pipeline {
                     echo 'Configurando herramientas...'
                     sh 'apt-get update && apt-get install -y curl docker.io'
                     sh 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+                    
+                    // Crear la red personalizada
+                    sh "docker network create ${TEST_NETWORK}"
+                    
+                    // Conectar el contenedor actual (donde corre Jenkins Agent) a la nueva red
+                    def containerId = sh(script: "hostname", returnStdout: true).trim()
+                    sh "docker network connect ${TEST_NETWORK} ${containerId}"
                 }
             }
         }
@@ -32,23 +42,19 @@ pipeline {
         stage('Run Integration Tests') {
             steps {
                 script {
-                    // 1. Detectar la red del contenedor actual de Jenkins
-                    def networkId = sh(script: "docker inspect \$(hostname) -f '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}'", returnStdout: true).trim()
-                    
-                    // 2. Levantar Postgres en esa misma red
+                    // Levantar Postgres en la misma red
                     docker.image('postgres:15-alpine').withRun(
-                        "--network ${networkId} " + 
-                        "--name tododbtest " +
+                        "--network ${env.TEST_NETWORK} " + 
+                        "--name ${env.DB_HOST} " +
                         "-e POSTGRES_USER=user " +
                         "-e POSTGRES_PASSWORD=password " +
                         "-e POSTGRES_DB=todo_db"
                     ) { c ->
-                        echo 'Esperando a que la base de datos esté lista para recibir conexiones...'
-                        // Aumentamos a 20s porque Postgres tarda en crear los archivos internos
+                        echo 'Esperando a que la base de datos esté lista...'
                         sh 'sleep 20' 
                         
                         echo 'Ejecutando Pytest...'
-                        // Pasamos explícitamente la variable de entorno
+                        // Usamos la DATABASE_URL que apunta al host dinámico
                         sh "DATABASE_URL=${env.DATABASE_URL} /root/.local/bin/uv run pytest"
                     }
                 }
@@ -59,9 +65,14 @@ pipeline {
     post {
         always {
             script {
-                // Limpieza: Borrar el contenedor de test para que no estorbe en la próxima ejecución
-                sh 'docker rm -f tododbtest || true'
-                echo 'Finalizando ejecución...'
+                echo 'Limpiando recursos...'
+                // Borrar el contenedor si se quedó pegado
+                sh "docker rm -f ${env.DB_HOST} || true"
+                
+                // Desconectar el agente de la red y borrar la red
+                def containerId = sh(script: "hostname", returnStdout: true).trim()
+                sh "docker network disconnect ${env.TEST_NETWORK} ${containerId} || true"
+                sh "docker network rm ${env.TEST_NETWORK} || true"
             }
         }
     }
