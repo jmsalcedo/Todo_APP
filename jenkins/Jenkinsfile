@@ -14,8 +14,8 @@ pipeline {
         DB_PORT = "5433" 
         APP_PORT = "9000"
         DATABASE_URL = "postgresql://user:password@${DB_HOST}:${env.DB_PORT}/todo_db"
-        
-        DOCKER_IMAGE = "kaoru751/todo-app-backend"
+       
+        DOCKER_IMAGE = "salcedoj/todo-app-backend"
         DOCKER_TAG = "${BUILD_NUMBER}"
         DOCKER_CREDENTIAL_ID = 'dockerhub-cred'
         
